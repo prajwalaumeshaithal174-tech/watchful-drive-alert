@@ -6,7 +6,7 @@ import { startContinuousAlarm, stopContinuousAlarm, speak } from "@/lib/audio";
 
 export const Route = createFileRoute("/manager")({
   head: () => ({ meta: [{ title: "Manager Control Panel — Guardian Eye Alert" }] }),
-  component: ManagerPanel;
+  component: ManagerPanel,
 });
 
 interface DriverState extends DriverStatus {}
