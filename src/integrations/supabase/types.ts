@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      driver_status: {
+        Row: {
+          driver_id: string
+          driver_name: string
+          duration_ms: number
+          level: string
+          updated_at: string
+        }
+        Insert: {
+          driver_id: string
+          driver_name: string
+          duration_ms?: number
+          level?: string
+          updated_at?: string
+        }
+        Update: {
+          driver_id?: string
+          driver_name?: string
+          duration_ms?: number
+          level?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
