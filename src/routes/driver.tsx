@@ -25,6 +25,9 @@ function DriverDashboard() {
   const lastBeepRef = useRef(0);
   const stageRef = useRef<AlertLevel>("ok");
   const sosSpokenRef = useRef(false);
+  const eyesOpenStartRef = useRef<number | null>(null);
+  const sosLatchedRef = useRef(false);
+  const [sosLatched, setSosLatched] = useState(false);
 
   useEffect(() => {
     if (!account) { navigate({ to: "/" }); return; }
@@ -162,6 +165,7 @@ function DriverDashboard() {
   useEffect(() => {
     const id = setInterval(() => {
       if (eyesClosed) {
+        eyesOpenStartRef.current = null;
         if (drowsyStartRef.current == null) {
           drowsyStartRef.current = Date.now();
           sosSpokenRef.current = false;
@@ -173,6 +177,13 @@ function DriverDashboard() {
         if (elapsed >= 6000) next = "sos";
         else if (elapsed >= 4000) next = "lane";
         else if (elapsed >= 2000) next = "drowsy";
+
+        // Once SOS has latched, keep it at SOS regardless of momentary eye opens
+        if (sosLatchedRef.current) next = "sos";
+        if (next === "sos") {
+          sosLatchedRef.current = true;
+          setSosLatched(true);
+        }
 
         if (next !== stageRef.current) {
           stageRef.current = next;
@@ -197,6 +208,23 @@ function DriverDashboard() {
         }
         if (next !== "ok") broadcast(next, elapsed);
       } else {
+        // SOS is latched — never auto-clear; require manual acknowledge
+        if (sosLatchedRef.current) {
+          if (Date.now() - lastBeepRef.current > 1500) {
+            beepOnce(1200, 400);
+            lastBeepRef.current = Date.now();
+          }
+          broadcast("sos", Math.max(drowsyMs, 6000));
+          return;
+        }
+        // Require eyes open for 1.5s before clearing drowsy/lane state
+        if (eyesOpenStartRef.current == null) eyesOpenStartRef.current = Date.now();
+        const openFor = Date.now() - eyesOpenStartRef.current;
+        if (openFor < 1500 && stageRef.current !== "ok") {
+          // hold current stage briefly to avoid blink-induced flicker
+          broadcast(stageRef.current, drowsyMs);
+          return;
+        }
         if (drowsyStartRef.current != null) {
           drowsyStartRef.current = null;
           setDrowsyMs(0);
@@ -210,7 +238,20 @@ function DriverDashboard() {
       }
     }, 150);
     return () => clearInterval(id);
-  }, [eyesClosed]);
+  }, [eyesClosed, drowsyMs]);
+
+  const acknowledgeSos = () => {
+    sosLatchedRef.current = false;
+    setSosLatched(false);
+    sosSpokenRef.current = false;
+    drowsyStartRef.current = null;
+    eyesOpenStartRef.current = Date.now();
+    setDrowsyMs(0);
+    setShowLanePopup(false);
+    stageRef.current = "ok";
+    setStage("ok");
+    broadcast("ok", 0);
+  };
 
   const stageBadge = {
     ok:     { text: "ALERT",   cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
@@ -303,6 +344,12 @@ function DriverDashboard() {
             <p className="text-red-200 mt-4 max-w-md mx-auto text-sm sm:text-base">
               Driver is unresponsive. Manager has been notified. Pull over immediately.
             </p>
+            {sosLatched && (
+              <button
+                onClick={acknowledgeSos}
+                className="mt-6 px-5 py-2.5 rounded-lg bg-white text-red-700 font-bold hover:bg-red-100"
+              >I'm safe — clear SOS</button>
+            )}
           </div>
         </div>
       )}
