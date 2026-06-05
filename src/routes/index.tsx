@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { authenticate } from "@/lib/credentials";
+import { useServerFn } from "@tanstack/react-start";
+import { loginFn } from "@/lib/auth.functions";
 import { saveSession } from "@/lib/session";
 
 export const Route = createFileRoute("/")({
@@ -18,20 +19,29 @@ export const Route = createFileRoute("/")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const login = useServerFn(loginFn);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const acc = authenticate(username, password);
-    if (!acc) {
-      setError("Invalid credentials. Check the credentials PDF.");
-      return;
+    setBusy(true);
+    try {
+      const res = await login({ data: { username, password } });
+      if (!res.ok) {
+        setError("Invalid credentials. Check the credentials PDF.");
+        return;
+      }
+      saveSession(res.user);
+      navigate({ to: res.user.role === "manager" ? "/manager" : "/driver" });
+    } catch {
+      setError("Could not sign in. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    saveSession(acc);
-    navigate({ to: acc.role === "manager" ? "/manager" : "/driver" });
   };
 
   return (
