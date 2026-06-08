@@ -335,6 +335,10 @@ function DriverDashboard() {
               Eyes: <span className={eyesClosed ? "text-red-400 font-bold" : "text-emerald-300"}>{eyesClosed ? "CLOSED" : "OPEN"}</span>
               {drowsyMs > 0 && <> · {(drowsyMs / 1000).toFixed(1)}s</>}
             </div>
+            <div className="absolute top-2 right-2 bg-black/60 rounded px-2 py-1 text-[11px] sm:text-xs space-y-0.5">
+              <div>Yawn: <span className={yawnPct > 60 ? "text-amber-300 font-bold" : "text-slate-200"}>{yawnPct}%</span></div>
+              <div>Head tilt: <span className={tiltPct > 50 ? "text-orange-300 font-bold" : "text-slate-200"}>{tiltPct}%</span></div>
+            </div>
           </div>
         </section>
 
@@ -352,6 +356,29 @@ function DriverDashboard() {
                 <span>6s — SOS Emergency</span><span>{drowsyMs >= 6000 ? "✓" : "—"}</span>
               </li>
             </ul>
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+            <h3 className="font-semibold mb-3">Fatigue Signals</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-300">Yawning</span>
+                  <span className={yawnPct > 60 ? "text-amber-300 font-bold" : "text-slate-400"}>{yawnPct}%</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all" style={{ width: `${yawnPct}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-300">Head Tilt</span>
+                  <span className={tiltPct > 50 ? "text-orange-300 font-bold" : "text-slate-400"}>{tiltPct}%</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all" style={{ width: `${tiltPct}%` }} />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
             Status syncs live to your manager across any device. Keep this tab open while driving.
