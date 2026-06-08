@@ -20,6 +20,8 @@ function DriverDashboard() {
   const [drowsyMs, setDrowsyMs] = useState(0);
   const [cameraOk, setCameraOk] = useState(false);
   const [showLanePopup, setShowLanePopup] = useState(false);
+  const [yawnPct, setYawnPct] = useState(0);
+  const [tiltPct, setTiltPct] = useState(0);
 
   const drowsyStartRef = useRef<number | null>(null);
   const lastBeepRef = useRef(0);
@@ -147,6 +149,37 @@ function DriverDashboard() {
           ctx.closePath();
           ctx.stroke();
         });
+
+        // Mouth Aspect Ratio (MAR) → yawn %
+        // Outer mouth corners: 61 (L), 291 (R); top: 13, bottom: 14
+        const dist = (a: any, b: any) => Math.hypot(a.x - b.x, a.y - b.y);
+        const mouthW = dist(lms[61], lms[291]);
+        const mouthH = dist(lms[13], lms[14]);
+        const mar = mouthW === 0 ? 0 : mouthH / mouthW;
+        // 0.05 ≈ closed, 0.6+ ≈ wide yawn
+        const yawn = Math.max(0, Math.min(100, Math.round(((mar - 0.05) / 0.55) * 100)));
+        setYawnPct(yawn);
+
+        // Head tilt (roll) from eye line angle
+        const lEye = lms[33], rEye = lms[263];
+        const dy = rEye.y - lEye.y;
+        const dx = rEye.x - lEye.x;
+        const angleDeg = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI);
+        // 0° = level, 45°+ = strongly tilted
+        const tilt = Math.max(0, Math.min(100, Math.round((angleDeg / 45) * 100)));
+        setTiltPct(tilt);
+
+        // Draw mouth outline
+        ctx.strokeStyle = yawn > 60 ? "#f59e0b" : "#22d3ee";
+        ctx.beginPath();
+        const mouthIdx = [61, 13, 291, 14];
+        mouthIdx.forEach((i, k) => {
+          const x = lms[i].x * canvas.width;
+          const y = lms[i].y * canvas.height;
+          if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
       }
       setEyesClosed(closed);
       ctx.restore();
@@ -302,6 +335,10 @@ function DriverDashboard() {
               Eyes: <span className={eyesClosed ? "text-red-400 font-bold" : "text-emerald-300"}>{eyesClosed ? "CLOSED" : "OPEN"}</span>
               {drowsyMs > 0 && <> · {(drowsyMs / 1000).toFixed(1)}s</>}
             </div>
+            <div className="absolute top-2 right-2 bg-black/60 rounded px-2 py-1 text-[11px] sm:text-xs space-y-0.5">
+              <div>Yawn: <span className={yawnPct > 60 ? "text-amber-300 font-bold" : "text-slate-200"}>{yawnPct}%</span></div>
+              <div>Head tilt: <span className={tiltPct > 50 ? "text-orange-300 font-bold" : "text-slate-200"}>{tiltPct}%</span></div>
+            </div>
           </div>
         </section>
 
@@ -319,6 +356,29 @@ function DriverDashboard() {
                 <span>6s — SOS Emergency</span><span>{drowsyMs >= 6000 ? "✓" : "—"}</span>
               </li>
             </ul>
+          </div>
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+            <h3 className="font-semibold mb-3">Fatigue Signals</h3>
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-300">Yawning</span>
+                  <span className={yawnPct > 60 ? "text-amber-300 font-bold" : "text-slate-400"}>{yawnPct}%</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all" style={{ width: `${yawnPct}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-slate-300">Head Tilt</span>
+                  <span className={tiltPct > 50 ? "text-orange-300 font-bold" : "text-slate-400"}>{tiltPct}%</span>
+                </div>
+                <div className="h-2 bg-slate-800 rounded overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all" style={{ width: `${tiltPct}%` }} />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400">
             Status syncs live to your manager across any device. Keep this tab open while driving.
