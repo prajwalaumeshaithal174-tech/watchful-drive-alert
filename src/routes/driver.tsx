@@ -20,6 +20,8 @@ function DriverDashboard() {
   const [drowsyMs, setDrowsyMs] = useState(0);
   const [cameraOk, setCameraOk] = useState(false);
   const [showLanePopup, setShowLanePopup] = useState(false);
+  const [yawnPct, setYawnPct] = useState(0);
+  const [tiltPct, setTiltPct] = useState(0);
 
   const drowsyStartRef = useRef<number | null>(null);
   const lastBeepRef = useRef(0);
@@ -147,6 +149,37 @@ function DriverDashboard() {
           ctx.closePath();
           ctx.stroke();
         });
+
+        // Mouth Aspect Ratio (MAR) → yawn %
+        // Outer mouth corners: 61 (L), 291 (R); top: 13, bottom: 14
+        const dist = (a: any, b: any) => Math.hypot(a.x - b.x, a.y - b.y);
+        const mouthW = dist(lms[61], lms[291]);
+        const mouthH = dist(lms[13], lms[14]);
+        const mar = mouthW === 0 ? 0 : mouthH / mouthW;
+        // 0.05 ≈ closed, 0.6+ ≈ wide yawn
+        const yawn = Math.max(0, Math.min(100, Math.round(((mar - 0.05) / 0.55) * 100)));
+        setYawnPct(yawn);
+
+        // Head tilt (roll) from eye line angle
+        const lEye = lms[33], rEye = lms[263];
+        const dy = rEye.y - lEye.y;
+        const dx = rEye.x - lEye.x;
+        const angleDeg = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI);
+        // 0° = level, 45°+ = strongly tilted
+        const tilt = Math.max(0, Math.min(100, Math.round((angleDeg / 45) * 100)));
+        setTiltPct(tilt);
+
+        // Draw mouth outline
+        ctx.strokeStyle = yawn > 60 ? "#f59e0b" : "#22d3ee";
+        ctx.beginPath();
+        const mouthIdx = [61, 13, 291, 14];
+        mouthIdx.forEach((i, k) => {
+          const x = lms[i].x * canvas.width;
+          const y = lms[i].y * canvas.height;
+          if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.stroke();
       }
       setEyesClosed(closed);
       ctx.restore();
