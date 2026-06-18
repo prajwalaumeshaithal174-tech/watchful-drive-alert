@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { publishStatusFn } from "./status.functions";
 
 export type AlertLevel = "ok" | "drowsy" | "lane" | "sos";
 
@@ -16,16 +17,14 @@ export async function publishStatus(
   level: AlertLevel,
   durationMs: number,
 ) {
-  await supabase.from("driver_status").upsert(
-    {
-      driver_id: driverId,
-      driver_name: driverName,
+  await publishStatusFn({
+    data: {
+      driverId,
+      driverName,
       level,
-      duration_ms: Math.round(durationMs),
-      updated_at: new Date().toISOString(),
+      durationMs: Math.round(durationMs),
     },
-    { onConflict: "driver_id" },
-  );
+  });
 }
 
 export async function fetchAllStatus(): Promise<DriverStatusRow[]> {
