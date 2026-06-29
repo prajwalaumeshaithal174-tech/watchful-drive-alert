@@ -313,7 +313,13 @@ function DriverDashboard() {
               {stageBadge.text}
             </span>
             <button
-              onClick={() => { clearSession(); navigate({ to: "/" }); }}
+              onClick={async () => {
+                sosLatchedRef.current = false;
+                stageRef.current = "ok";
+                try { await publishStatus(account!.username, account!.displayName, "ok", 0); } catch {}
+                clearSession();
+                navigate({ to: "/" });
+              }}
               className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border border-slate-700 hover:bg-slate-800 transition"
             >Logout</button>
           </div>
