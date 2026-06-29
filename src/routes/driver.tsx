@@ -28,8 +28,7 @@ function DriverDashboard() {
   const stageRef = useRef<AlertLevel>("ok");
   const sosSpokenRef = useRef(false);
   const eyesOpenStartRef = useRef<number | null>(null);
-  const sosLatchedRef = useRef(false);
-  const [sosLatched, setSosLatched] = useState(false);
+  const lastBroadcastRef = useRef({ level: "ok" as AlertLevel, at: 0 });
 
   useEffect(() => {
     if (!account) { navigate({ to: "/" }); return; }
@@ -41,13 +40,13 @@ function DriverDashboard() {
     publishStatus(account.username, account.displayName, level, duration).catch(console.error);
   };
 
-  // Heartbeat: publish "ok" so manager sees driver is online
+  // Heartbeat: keep republishing current status so manager always sees driver as live
   useEffect(() => {
     if (!account) return;
     broadcast("ok", 0);
     const id = setInterval(() => {
-      if (stageRef.current === "ok") broadcast("ok", 0);
-    }, 10000);
+      broadcast(stageRef.current, drowsyStartRef.current ? Date.now() - drowsyStartRef.current : 0);
+    }, 5000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.username]);
@@ -194,6 +193,15 @@ function DriverDashboard() {
     };
   }, []);
 
+  // Throttled broadcast: send on level change or every 3s
+  const sendStatus = (level: AlertLevel, duration: number) => {
+    const now = Date.now();
+    if (level !== lastBroadcastRef.current.level || now - lastBroadcastRef.current.at > 3000) {
+      lastBroadcastRef.current = { level, at: now };
+      broadcast(level, duration);
+    }
+  };
+
   // Escalation timer
   useEffect(() => {
     const id = setInterval(() => {
@@ -211,13 +219,6 @@ function DriverDashboard() {
         else if (elapsed >= 4000) next = "lane";
         else if (elapsed >= 2000) next = "drowsy";
 
-        // Once SOS has latched, keep it at SOS regardless of momentary eye opens
-        if (sosLatchedRef.current) next = "sos";
-        if (next === "sos") {
-          sosLatchedRef.current = true;
-          setSosLatched(true);
-        }
-
         if (next !== stageRef.current) {
           stageRef.current = next;
           setStage(next);
@@ -227,7 +228,7 @@ function DriverDashboard() {
             sosSpokenRef.current = true;
             speak("SOS emergency! Pull over safely now.");
           }
-          broadcast(next, elapsed);
+          sendStatus(next, elapsed);
         } else if (next === "drowsy") {
           if (Date.now() - lastBeepRef.current > 700) {
             beepOnce(880, 250);
@@ -239,23 +240,14 @@ function DriverDashboard() {
             lastBeepRef.current = Date.now();
           }
         }
-        if (next !== "ok") broadcast(next, elapsed);
+        if (next !== "ok") sendStatus(next, elapsed);
       } else {
-        // SOS is latched — never auto-clear; require manual acknowledge
-        if (sosLatchedRef.current) {
-          if (Date.now() - lastBeepRef.current > 1500) {
-            beepOnce(1200, 400);
-            lastBeepRef.current = Date.now();
-          }
-          broadcast("sos", Math.max(drowsyMs, 6000));
-          return;
-        }
         // Require eyes open for 1.5s before clearing drowsy/lane state
         if (eyesOpenStartRef.current == null) eyesOpenStartRef.current = Date.now();
         const openFor = Date.now() - eyesOpenStartRef.current;
         if (openFor < 1500 && stageRef.current !== "ok") {
           // hold current stage briefly to avoid blink-induced flicker
-          broadcast(stageRef.current, drowsyMs);
+          sendStatus(stageRef.current, drowsyMs);
           return;
         }
         if (drowsyStartRef.current != null) {
@@ -265,26 +257,13 @@ function DriverDashboard() {
           if (stageRef.current !== "ok") {
             stageRef.current = "ok";
             setStage("ok");
-            broadcast("ok", 0);
+            sendStatus("ok", 0);
           }
         }
       }
     }, 150);
     return () => clearInterval(id);
   }, [eyesClosed, drowsyMs]);
-
-  const acknowledgeSos = () => {
-    sosLatchedRef.current = false;
-    setSosLatched(false);
-    sosSpokenRef.current = false;
-    drowsyStartRef.current = null;
-    eyesOpenStartRef.current = Date.now();
-    setDrowsyMs(0);
-    setShowLanePopup(false);
-    stageRef.current = "ok";
-    setStage("ok");
-    broadcast("ok", 0);
-  };
 
   const stageBadge = {
     ok:     { text: "ALERT",   cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
