@@ -43,7 +43,10 @@ function ManagerPanel() {
 
   useEffect(() => {
     const anyAlert = Object.values(drivers).some(
-      d => d.level !== "ok" && d.duration_ms >= 2000,
+      d =>
+        d.level !== "ok" &&
+        d.duration_ms >= 2000 &&
+        Date.now() - new Date(d.updated_at).getTime() <= 20000,
     );
     if (anyAlert && audioArmed && !alarmOnRef.current) {
       startContinuousAlarm(1000);
@@ -56,6 +59,8 @@ function ManagerPanel() {
 
     if (audioArmed) {
       for (const d of Object.values(drivers)) {
+        const isStale = Date.now() - new Date(d.updated_at).getTime() > 20000;
+        if (isStale) continue;
         const prev = lastSpokenRef.current[d.driver_id];
         if (prev !== d.level) {
           lastSpokenRef.current[d.driver_id] = d.level;
@@ -70,7 +75,9 @@ function ManagerPanel() {
   useEffect(() => () => { stopContinuousAlarm(); }, []);
 
   const list = Object.values(drivers).sort((a, b) => a.driver_id.localeCompare(b.driver_id));
-  const activeAlerts = list.filter(d => d.level !== "ok").length;
+  const activeAlerts = list.filter(
+    d => d.level !== "ok" && Date.now() - new Date(d.updated_at).getTime() <= 20000,
+  ).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
