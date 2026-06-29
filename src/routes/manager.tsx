@@ -75,7 +75,9 @@ function ManagerPanel() {
   useEffect(() => () => { stopContinuousAlarm(); }, []);
 
   const list = Object.values(drivers).sort((a, b) => a.driver_id.localeCompare(b.driver_id));
-  const activeAlerts = list.filter(d => d.level !== "ok").length;
+  const activeAlerts = list.filter(
+    d => d.level !== "ok" && Date.now() - new Date(d.updated_at).getTime() <= 20000,
+  ).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
