@@ -7,7 +7,7 @@ import {
   type AlertLevel,
   type DriverStatusRow,
 } from "@/lib/status";
-import { startContinuousAlarm, stopContinuousAlarm, speak } from "@/lib/audio";
+import { startContinuousAlarm, stopContinuousAlarm, speak, beepOnce } from "@/lib/audio";
 
 export const Route = createFileRoute("/manager")({
   head: () => ({ meta: [{ title: "Manager Control Panel — Guardian Eye Alert" }] }),
@@ -42,11 +42,13 @@ function ManagerPanel() {
   }, []);
 
   useEffect(() => {
-    const anyAlert = Object.values(drivers).some(
+    const liveDrivers = Object.values(drivers).filter(
+      d => Date.now() - new Date(d.updated_at).getTime() <= 20000,
+    );
+    const anyAlert = liveDrivers.some(
       d =>
         d.level !== "ok" &&
-        d.duration_ms >= 2000 &&
-        Date.now() - new Date(d.updated_at).getTime() <= 20000,
+        d.duration_ms >= 2000,
     );
     if (anyAlert && audioArmed && !alarmOnRef.current) {
       startContinuousAlarm(1000);
@@ -58,15 +60,13 @@ function ManagerPanel() {
     }
 
     if (audioArmed) {
-      for (const d of Object.values(drivers)) {
-        const isStale = Date.now() - new Date(d.updated_at).getTime() > 20000;
-        if (isStale) continue;
+      for (const d of liveDrivers) {
         const prev = lastSpokenRef.current[d.driver_id];
         if (prev !== d.level) {
           lastSpokenRef.current[d.driver_id] = d.level;
-          if (d.level === "sos") speak(`SOS emergency from ${d.driver_name}`);
-          else if (d.level === "lane") speak(`${d.driver_name}, change lane warning`);
-          else if (d.level === "drowsy") speak(`Drowsiness alert for ${d.driver_name}`);
+          if (d.level === "drowsy") { beepOnce(880, 300); speak(`Drowsiness alert for ${d.driver_name}`); }
+          else if (d.level === "lane") { beepOnce(1000, 350); speak(`${d.driver_name}, change the lane`); }
+          else if (d.level === "sos") { beepOnce(1200, 500); speak(`SOS emergency from ${d.driver_name}. Pull over now.`); }
         }
       }
     }
@@ -75,9 +75,10 @@ function ManagerPanel() {
   useEffect(() => () => { stopContinuousAlarm(); }, []);
 
   const list = Object.values(drivers).sort((a, b) => a.driver_id.localeCompare(b.driver_id));
-  const activeAlerts = list.filter(
-    d => d.level !== "ok" && Date.now() - new Date(d.updated_at).getTime() <= 20000,
-  ).length;
+  const liveList = list.filter(d => Date.now() - new Date(d.updated_at).getTime() <= 20000);
+  const activeAlerts = liveList.filter(d => d.level !== "ok").length;
+  const sosDriver = liveList.find(d => d.level === "sos");
+  const laneDriver = !sosDriver ? liveList.find(d => d.level === "lane") : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -143,6 +144,28 @@ function ManagerPanel() {
           </ul>
         </section>
       </main>
+
+      {laneDriver && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-orange-500 text-black rounded-2xl p-6 sm:p-8 max-w-md text-center shadow-2xl animate-bounce">
+            <p className="text-xs sm:text-sm uppercase tracking-widest font-bold">Drowsiness detected</p>
+            <p className="text-3xl sm:text-4xl font-black mt-2">CHANGE THE LANE</p>
+            <p className="mt-3 text-sm">{laneDriver.driver_name} — instruct driver to pull into the slow lane.</p>
+          </div>
+        </div>
+      )}
+
+      {sosDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-red-950/90 p-4">
+          <div className="text-center">
+            <p className="text-red-300 uppercase tracking-[0.3em] text-xs sm:text-sm">Emergency</p>
+            <p className="text-6xl sm:text-7xl font-black text-white mt-2 animate-pulse">SOS</p>
+            <p className="text-red-200 mt-4 max-w-md mx-auto text-sm sm:text-base">
+              {sosDriver.driver_name} is unresponsive. Contact driver immediately.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
