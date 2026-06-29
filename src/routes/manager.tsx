@@ -21,7 +21,6 @@ function ManagerPanel() {
   const [audioArmed, setAudioArmed] = useState(false);
   const alarmOnRef = useRef(false);
   const lastSpokenRef = useRef<Record<string, AlertLevel>>({});
-  const lastBeepRef = useRef(0);
 
   useEffect(() => {
     if (!account) { navigate({ to: "/" }); return; }
