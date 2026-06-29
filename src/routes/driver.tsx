@@ -293,7 +293,6 @@ function DriverDashboard() {
             </span>
             <button
               onClick={async () => {
-                sosLatchedRef.current = false;
                 stageRef.current = "ok";
                 try { await publishStatus(account!.username, account!.displayName, "ok", 0); } catch {}
                 clearSession();
@@ -389,12 +388,6 @@ function DriverDashboard() {
             <p className="text-red-200 mt-4 max-w-md mx-auto text-sm sm:text-base">
               Driver is unresponsive. Manager has been notified. Pull over immediately.
             </p>
-            {sosLatched && (
-              <button
-                onClick={acknowledgeSos}
-                className="mt-6 px-5 py-2.5 rounded-lg bg-white text-red-700 font-bold hover:bg-red-100"
-              >I'm safe — clear SOS</button>
-            )}
           </div>
         </div>
       )}
